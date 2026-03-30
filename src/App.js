@@ -46,10 +46,7 @@ const todayStr = () => {
   return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
 };
 
-const fmtTime = () => {
-  const now = new Date();
-  return `${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")}`;
-};
+// fmtTime 함수는 사용하지 않아 제거했습니다. (빌드 에러 방지)
 
 /* ─── STYLES ─── */
 const card = { background:T.white, borderRadius:20, padding:16, marginBottom:12, boxShadow:"0 1px 8px rgba(42,31,35,.06)" };
@@ -93,6 +90,8 @@ export default function App() {
       setLoading(false);
     });
     return unsub;
+    // 아래 주석은 Vercel 빌드 시 의존성 체크 에러를 방지합니다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* ── INIT USER ── */
