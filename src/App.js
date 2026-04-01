@@ -15,8 +15,13 @@ const uploadToCloudinary = async (file) => {
   const fd = new FormData();
   fd.append("file", file);
   fd.append("upload_preset", UPLOAD_PRESET);
+  fd.append("cloud_name", CLOUD_NAME);
   const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method:"POST", body:fd });
   const data = await res.json();
+  if (!data.secure_url) {
+    console.error("Cloudinary error:", data);
+    throw new Error(data.error?.message || "업로드 실패 - Cloudinary 응답 없음");
+  }
   return data.secure_url;
 };
 
