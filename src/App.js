@@ -144,6 +144,44 @@ export default function App(){
   const pill=(a,c)=>({background:a?(c||T.p):T.l,color:a?"#fff":T.p,border:"none",borderRadius:50,padding:"7px 16px",fontWeight:500,fontSize:13,cursor:"pointer",flexShrink:0,fontFamily:"'Noto Sans KR',sans-serif",transition:"all .2s"});
   const goldRule={height:1,background:`linear-gradient(to right,transparent,${T.gold}44,transparent)`,margin:"2px 0"};
 
+  const initUser=async u=>{
+    const ref=doc(db,"users",u.uid);const snap=await getDoc(ref);
+    if(!snap.exists()){
+      const code=Math.random().toString(36).substring(2,8).toUpperCase();
+      await setDoc(ref,{uid:u.uid,name:u.displayName||"나",email:u.email,photoURL:u.photoURL||"",code,coupleId:null,createdAt:serverTimestamp()});
+      setMyCode(code);setMyName(u.displayName||"나");setMyAvatar(u.photoURL||null);setShowConnect(true);
+    }else{
+      const d=snap.data();
+      setMyCode(d.code);setMyName(d.name||u.displayName||"나");setMyAvatar(d.photoURL||u.photoURL||null);
+      if(d.themeKey)setThemeKey(d.themeKey);
+      if(d.missionMode)setMissionMode(d.missionMode);
+      if(d.customMissions)setCustomMissions(d.customMissions);
+      if(d.diaryTemplate)setDiaryTemplate(d.diaryTemplate);
+      if(d.coupleId){await loadCouple(u.uid,d.coupleId);setShowConnect(false);}
+      else setShowConnect(true);
+    }
+  };
+
+  const loadCouple=async(myUid,cId)=>{
+    const cSnap=await getDoc(doc(db,"couples",cId));if(!cSnap.exists())return;
+    const cData=cSnap.data();
+    const pId=cData.user1===myUid?cData.user2:cData.user1;
+    const pSnap=await getDoc(doc(db,"users",pId));const pData=pSnap.exists()?pSnap.data():{};
+    setCouple({coupleId:cId,partnerId:pId,partnerName:pData.name||"파트너",startDate:cData.startDate});
+    setPartnerAvatar(pData.photoURL||null);
+    if(cData.sharedBg)setSharedBg(cData.sharedBg);
+
+    onSnapshot(query(collection(db,"couples",cId,"messages"),orderBy("createdAt")),s=>setMessages(s.docs.map(d=>({id:d.id,...d.data()}))));
+    onSnapshot(collection(db,"couples",cId,"events"),s=>{const map={};s.docs.forEach(d=>{const ev={id:d.id,...d.data()};if(!map[ev.dateKey])map[ev.dateKey]=[];map[ev.dateKey].push(ev);});setEvents(map);});
+    onSnapshot(query(collection(db,"couples",cId,"diaries"),orderBy("createdAt","desc")),s=>setDiaries(s.docs.map(d=>({id:d.id,...d.data()}))));
+    onSnapshot(query(collection(db,"couples",cId,"photos"),orderBy("createdAt","desc")),s=>setPhotos(s.docs.map(d=>({id:d.id,...d.data()}))));
+    onSnapshot(collection(db,"couples",cId,"albums"),s=>setAlbums([{id:"default",name:"우리의 추억"},...s.docs.map(d=>({id:d.id,...d.data()}))]));
+    onSnapshot(doc(db,"couples",cId),s=>{if(s.exists()&&s.data().sharedBg)setSharedBg(s.data().sharedBg);});
+    const mSnap=await getDoc(doc(db,"couples",cId,"missions","today"));
+    if(mSnap.exists()&&mSnap.data().date===todayStr()){setMissionsDone(mSnap.data().completed||[]);setMissionsDate(mSnap.data().date);}
+  };
+
+  const savePrefs=async p=>{if(!user)return;await updateDoc(doc(db,"users",user.uid),p);};
   /* ── AUTH ── */
   useEffect(()=>{
     const unsub=onAuthStateChanged(auth,async u=>{
@@ -183,44 +221,6 @@ export default function App(){
   },[messages]);
   useEffect(()=>{if(tab==="chat")setUnread(0);},[tab]);
 
-  const initUser=async u=>{
-    const ref=doc(db,"users",u.uid);const snap=await getDoc(ref);
-    if(!snap.exists()){
-      const code=Math.random().toString(36).substring(2,8).toUpperCase();
-      await setDoc(ref,{uid:u.uid,name:u.displayName||"나",email:u.email,photoURL:u.photoURL||"",code,coupleId:null,createdAt:serverTimestamp()});
-      setMyCode(code);setMyName(u.displayName||"나");setMyAvatar(u.photoURL||null);setShowConnect(true);
-    }else{
-      const d=snap.data();
-      setMyCode(d.code);setMyName(d.name||u.displayName||"나");setMyAvatar(d.photoURL||u.photoURL||null);
-      if(d.themeKey)setThemeKey(d.themeKey);
-      if(d.missionMode)setMissionMode(d.missionMode);
-      if(d.customMissions)setCustomMissions(d.customMissions);
-      if(d.diaryTemplate)setDiaryTemplate(d.diaryTemplate);
-      if(d.coupleId){await loadCouple(u.uid,d.coupleId);setShowConnect(false);}
-      else setShowConnect(true);
-    }
-  };
-
-  const loadCouple=async(myUid,cId)=>{
-    const cSnap=await getDoc(doc(db,"couples",cId));if(!cSnap.exists())return;
-    const cData=cSnap.data();
-    const pId=cData.user1===myUid?cData.user2:cData.user1;
-    const pSnap=await getDoc(doc(db,"users",pId));const pData=pSnap.exists()?pSnap.data():{};
-    setCouple({coupleId:cId,partnerId:pId,partnerName:pData.name||"파트너",startDate:cData.startDate});
-    setPartnerAvatar(pData.photoURL||null);
-    if(cData.sharedBg)setSharedBg(cData.sharedBg);
-
-    onSnapshot(query(collection(db,"couples",cId,"messages"),orderBy("createdAt")),s=>setMessages(s.docs.map(d=>({id:d.id,...d.data()}))));
-    onSnapshot(collection(db,"couples",cId,"events"),s=>{const map={};s.docs.forEach(d=>{const ev={id:d.id,...d.data()};if(!map[ev.dateKey])map[ev.dateKey]=[];map[ev.dateKey].push(ev);});setEvents(map);});
-    onSnapshot(query(collection(db,"couples",cId,"diaries"),orderBy("createdAt","desc")),s=>setDiaries(s.docs.map(d=>({id:d.id,...d.data()}))));
-    onSnapshot(query(collection(db,"couples",cId,"photos"),orderBy("createdAt","desc")),s=>setPhotos(s.docs.map(d=>({id:d.id,...d.data()}))));
-    onSnapshot(collection(db,"couples",cId,"albums"),s=>setAlbums([{id:"default",name:"우리의 추억"},...s.docs.map(d=>({id:d.id,...d.data()}))]));
-    onSnapshot(doc(db,"couples",cId),s=>{if(s.exists()&&s.data().sharedBg)setSharedBg(s.data().sharedBg);});
-    const mSnap=await getDoc(doc(db,"couples",cId,"missions","today"));
-    if(mSnap.exists()&&mSnap.data().date===todayStr()){setMissionsDone(mSnap.data().completed||[]);setMissionsDate(mSnap.data().date);}
-  };
-
-  const savePrefs=async p=>{if(!user)return;await updateDoc(doc(db,"users",user.uid),p);};
   const loginGoogle=async()=>{try{await signInWithPopup(auth,googleProvider);}catch(e){alert(e.message);}};
   const logout=async()=>{
     if(user)await setDoc(doc(db,"presence",user.uid),{online:false,lastSeen:serverTimestamp()},{merge:true});
@@ -413,8 +413,8 @@ export default function App(){
               <linearGradient id="li_rs" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#D4A860" stopOpacity=".4"/><stop offset="100%" stopColor="#B08030" stopOpacity=".25"/></linearGradient>
             </defs>
             <rect width="1024" height="1024" rx="216" fill="url(#li_bg)"/>
-            <circle cx="512" cy="480" r="346" fill="none" stroke="url(#li_rs)" stroke-width="1.3"/>
-            <path d="M 512 668 C 306 538,214 424,236 318 C 256 222,350 176,418 190 C 458 198,492 222,512 254 C 532 222,566 198,606 190 C 674 176,768 222,788 318 C 810 424,718 538,512 668 Z" fill="none" stroke="url(#li_rh)" stroke-width="14" strokeLinejoin="round" strokeLinecap="round"/>
+            <circle cx="512" cy="480" r="346" fill="none" stroke="url(#li_rs)" strokeWidth="1.3"/>
+            <path d="M 512 668 C 306 538,214 424,236 318 C 256 222,350 176,418 190 C 458 198,492 222,512 254 C 532 222,566 198,606 190 C 674 176,768 222,788 318 C 810 424,718 538,512 668 Z" fill="none" stroke="url(#li_rh)" strokeWidth="14" strokeLinejoin="round" strokeLinecap="round"/>
             <text x="512" y="860" textAnchor="middle" fontFamily="'Tenor Sans',Georgia,serif" fontSize="118" fontWeight="400" letterSpacing="34" fill="url(#li_it)">OURS</text>
           </svg>
         </div>
@@ -820,7 +820,7 @@ export default function App(){
               <svg width="32" height="32" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
                 <defs><linearGradient id="st_bg" x1="0" y1="0" x2=".6" y2="1"><stop offset="0%" stopColor="#FBF8F2"/><stop offset="100%" stopColor="#F0E8DF"/></linearGradient><linearGradient id="st_rh" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#D49098"/><stop offset="100%" stopColor="#904858"/></linearGradient><linearGradient id="st_it" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2C1E18"/><stop offset="100%" stopColor="#4A3028"/></linearGradient></defs>
                 <rect width="1024" height="1024" rx="216" fill="url(#st_bg)"/>
-                <path d="M 512 668 C 306 538,214 424,236 318 C 256 222,350 176,418 190 C 458 198,492 222,512 254 C 532 222,566 198,606 190 C 674 176,768 222,788 318 C 810 424,718 538,512 668 Z" fill="none" stroke="url(#st_rh)" stroke-width="16" strokeLinejoin="round" strokeLinecap="round"/>
+                <path d="M 512 668 C 306 538,214 424,236 318 C 256 222,350 176,418 190 C 458 198,492 222,512 254 C 532 222,566 198,606 190 C 674 176,768 222,788 318 C 810 424,718 538,512 668 Z" fill="none" stroke="url(#st_rh)" strokeWidth="16" strokeLinejoin="round" strokeLinecap="round"/>
                 <text x="512" y="860" textAnchor="middle" fontFamily="'Tenor Sans',Georgia,serif" fontSize="118" fontWeight="400" letterSpacing="34" fill="url(#st_it)">OURS</text>
               </svg>
               <h1 className="tenor" style={{fontSize:26,fontWeight:400,color:T.text,letterSpacing:"4px"}}>OURS</h1>
