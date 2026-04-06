@@ -63,7 +63,7 @@ export default function App(){
   const[tab,setTab]=useState("home");
   const[modal,setModal]=useState(null);
   const[themeKey,setThemeKey]=useState("cream");
-  const T=THEMES[themeKey];
+  const T=THEMES[themeKey]||THEMES["cream"];
 
   // Calendar
   const[calDate,setCalDate]=useState(new Date());
@@ -153,7 +153,7 @@ export default function App(){
     }else{
       const d=snap.data();
       setMyCode(d.code);setMyName(d.name||u.displayName||"나");setMyAvatar(d.photoURL||u.photoURL||null);
-      if(d.themeKey)setThemeKey(d.themeKey);
+      if(d.themeKey&&THEMES[d.themeKey])setThemeKey(d.themeKey);
       if(d.missionMode)setMissionMode(d.missionMode);
       if(d.customMissions)setCustomMissions(d.customMissions);
       if(d.diaryTemplate)setDiaryTemplate(d.diaryTemplate);
